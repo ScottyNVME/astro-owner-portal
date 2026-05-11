@@ -1,6 +1,17 @@
 ---
 import config from 'virtual:owner-portal/config';
+import { readSession } from '../lib/auth.js';
+import '../styles/theme.css';
+
 export const prerender = false;
+
+if (await readSession(Astro.cookies)) {
+  return Astro.redirect(`${config.adminPath}/chat`);
+}
+
+const accent = config.brand.accentColor;
+const authUrl = `${config.adminPath}/api/auth`;
+const nextUrl = `${config.adminPath}/chat`;
 ---
 <!doctype html>
 <html lang="en">
@@ -9,12 +20,76 @@ export const prerender = false;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Owner Portal · {config.brand.name}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
+    />
+    {config.brand.themeCss && <link rel="stylesheet" href={config.brand.themeCss} />}
+    <style is:inline set:html={`:root { --op-accent: ${accent}; --op-accent-dark: color-mix(in srgb, ${accent} 82%, black); }`}></style>
   </head>
-  <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem;">
-    <h1>Owner Portal (stub)</h1>
-    <p><strong>{config.brand.name}</strong> · mounted at <code>{config.adminPath}</code></p>
-    <p>Phase 1 plumbing only. Real login form lands in Phase 3.</p>
-    <h2>Resolved config</h2>
-    <pre style="background: #f4f4f4; padding: 1rem; border-radius: 8px; overflow: auto;">{JSON.stringify(config, null, 2)}</pre>
+  <body class="op-login-shell">
+    <div class="op-card">
+      <div class="op-card-center">
+        <img src={config.brand.logo} alt={config.brand.name} class="op-logo" />
+        <h1 class="op-h1">Owner Portal</h1>
+        <p class="op-subtle">Enter your password to make changes to the site.</p>
+      </div>
+
+      <form method="POST" action={authUrl} id="login-form">
+        <label class="op-field">
+          <span class="op-label">Password</span>
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+            autofocus
+            class="op-input"
+          />
+        </label>
+
+        <div id="error" role="alert" class="op-error op-hidden"></div>
+
+        <button type="submit" class="op-btn">Sign in</button>
+      </form>
+
+      <p class="op-help">Forgot the password? {config.contactInfo}.</p>
+    </div>
+
+    <script define:vars={{ authUrl, nextUrl }}>
+      const form = document.getElementById('login-form');
+      const errEl = document.getElementById('error');
+      const btn = form.querySelector('button[type="submit"]');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.classList.add('op-hidden');
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+
+        const password = form.elements.namedItem('password').value;
+        try {
+          const res = await fetch(authUrl, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ password }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            errEl.textContent = data.error ?? 'Something went wrong.';
+            errEl.classList.remove('op-hidden');
+            btn.disabled = false;
+            btn.textContent = 'Sign in';
+            return;
+          }
+          window.location.href = data.next ?? nextUrl;
+        } catch {
+          errEl.textContent = 'Network error. Try again.';
+          errEl.classList.remove('op-hidden');
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
+        }
+      });
+    </script>
   </body>
 </html>

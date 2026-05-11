@@ -1,6 +1,27 @@
 ---
 import config from 'virtual:owner-portal/config';
+import { readSession, clearSession } from '../lib/auth.js';
+import '../styles/theme.css';
+
 export const prerender = false;
+
+if (!(await readSession(Astro.cookies))) {
+  return Astro.redirect(config.adminPath);
+}
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  if (form.get('action') === 'logout') {
+    clearSession(Astro.cookies);
+    return Astro.redirect(config.adminPath);
+  }
+}
+
+const accent = config.brand.accentColor;
+const apiBase = `${config.adminPath}/api`;
+const allowedScopeLine = config.allowedFiles
+  .map((f) => (f.allowedFields ? `${f.path} (${f.allowedFields.join(', ')})` : f.path))
+  .join(', ');
 ---
 <!doctype html>
 <html lang="en">
@@ -9,18 +30,373 @@ export const prerender = false;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Owner Chat · {config.brand.name}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
+    />
+    {config.brand.themeCss && <link rel="stylesheet" href={config.brand.themeCss} />}
+    <style is:inline set:html={`:root { --op-accent: ${accent}; --op-accent-dark: color-mix(in srgb, ${accent} 82%, black); }`}></style>
   </head>
-  <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem;">
-    <h1>Owner Chat (stub)</h1>
-    <p><strong>{config.brand.name}</strong> · chat UI lands in Phase 3.</p>
-    <p>Allowed files for this site:</p>
-    <ul>
-      {config.allowedFiles.map((f) => (
-        <li>
-          <code>{f.path}</code>
-          {f.allowedFields ? ` — fields: ${f.allowedFields.join(', ')}` : ' (full file)'}
-        </li>
-      ))}
-    </ul>
+  <body>
+    <div class="op-chat-shell">
+      <header class="op-chat-header">
+        <div class="op-chat-header-inner">
+          <div class="op-brand-row">
+            <img src={config.brand.logo} alt="" class="op-brand-logo" />
+            <div>
+              <div class="op-brand-title">Owner Portal</div>
+              <div class="op-brand-sub">{config.brand.name}</div>
+            </div>
+          </div>
+          <form method="POST" style="display: inline;">
+            <input type="hidden" name="action" value="logout" />
+            <button class="op-signout">Sign out</button>
+          </form>
+        </div>
+      </header>
+
+      <main class="op-chat-main" id="chat-area">
+        <div class="op-welcome">
+          <div class="op-welcome-title">Hello. What needs updating?</div>
+          <p class="op-welcome-body">
+            Tell me what you want to change in plain English. I'll show you a diff before anything goes live. You can also drag a photo onto this window.
+          </p>
+          <p class="op-welcome-footnote">
+            Editable on this site: <strong>{allowedScopeLine}</strong>. Every change gets a preview link before publishing.
+          </p>
+        </div>
+
+        <div id="messages" class="op-messages"></div>
+        <div id="thinking" class="op-thinking op-hidden">Thinking…</div>
+      </main>
+
+      <div class="op-chat-foot">
+        <div class="op-chat-foot-inner">
+          <form id="chat-form" class="op-chat-form">
+            <label class="op-icon-btn" title="Upload a photo">
+              <input type="file" accept="image/*" id="file-input" hidden />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </label>
+            <textarea
+              id="message-input"
+              rows="1"
+              placeholder="Type a request… (Enter to send, Shift+Enter for newline)"
+              class="op-textarea"
+            ></textarea>
+            <button type="submit" class="op-send">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script define:vars={{ apiBase, productionDomain: config.productionDomain, contactInfo: config.contactInfo }}>
+      const state = {
+        messages: [],
+        pendingProposal: null,
+        activeBranch: null,
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const messagesEl = $('messages');
+      const thinkingEl = $('thinking');
+      const formEl = $('chat-form');
+      const inputEl = $('message-input');
+      const fileInput = $('file-input');
+      const sendBtn = formEl.querySelector('button[type="submit"]');
+      const chatArea = $('chat-area');
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function appendBubble(role, text) {
+        const wrap = document.createElement('div');
+        wrap.className = role === 'user' ? 'op-bubble op-bubble-user' : 'op-bubble op-bubble-assistant';
+        wrap.textContent = text;
+        messagesEl.appendChild(wrap);
+        scrollToBottom();
+      }
+
+      function appendStatus(text, kind = 'info') {
+        const cls = kind === 'success' ? 'op-status op-status-success'
+          : kind === 'error' ? 'op-status op-status-error'
+          : 'op-status';
+        const el = document.createElement('div');
+        el.className = cls;
+        el.textContent = text;
+        messagesEl.appendChild(el);
+        scrollToBottom();
+      }
+
+      function renderProposal(p) {
+        const card = document.createElement('div');
+        card.className = 'op-diff-card';
+        card.innerHTML = `
+          <div class="op-diff-header">
+            <div class="op-diff-title">Proposed change</div>
+            <code class="op-diff-path">${escapeHtml(p.path)}</code>
+          </div>
+          <p class="op-diff-summary">${escapeHtml(p.summary)}</p>
+          <div class="op-diff-rows">
+            <div class="op-diff-old"><pre style="margin:0">${escapeHtml(p.oldString)}</pre></div>
+            <div class="op-diff-new"><pre style="margin:0">${escapeHtml(p.newString)}</pre></div>
+          </div>
+          <div class="op-diff-actions">
+            <button data-action="apply" class="op-btn">Apply</button>
+            <button data-action="cancel" class="op-btn-ghost">Cancel</button>
+          </div>
+        `;
+        card.querySelector('[data-action="apply"]').addEventListener('click', () => applyProposal(p, card));
+        card.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+          state.pendingProposal = null;
+          card.remove();
+          appendStatus('Change cancelled.');
+        });
+        messagesEl.appendChild(card);
+        scrollToBottom();
+      }
+
+      function renderBudgetCard(resetDate) {
+        const card = document.createElement('div');
+        card.className = 'op-budget-card';
+        card.innerHTML = `
+          <div class="op-budget-row">
+            <div class="op-budget-icon">⚠</div>
+            <div>
+              <div class="op-preview-title">Monthly assistant budget reached</div>
+              <p class="op-preview-body" style="margin-bottom: 0.5rem">
+                The Claude API spend cap for this site has been hit for the month. The chat will work again on <strong>${escapeHtml(resetDate)}</strong>.
+              </p>
+              <p class="op-preview-body" style="margin: 0">Need a change before then? ${escapeHtml(contactInfo)} and it'll get pushed directly.</p>
+            </div>
+          </div>
+        `;
+        messagesEl.appendChild(card);
+        scrollToBottom();
+        sendBtn.disabled = true;
+        inputEl.disabled = true;
+        inputEl.placeholder = 'Chat paused until the budget resets.';
+      }
+
+      function renderPreviewCard(previewUrl, branch) {
+        const card = document.createElement('div');
+        card.className = 'op-preview-card';
+        card.innerHTML = `
+          <div class="op-preview-title">Preview is building</div>
+          <p class="op-preview-body">Give it about 30–60 seconds. Open the preview, check the change, then publish or discard.</p>
+          <div class="op-preview-actions">
+            <a href="${escapeHtml(previewUrl)}" target="_blank" rel="noopener noreferrer" class="op-link-btn">Open preview ↗</a>
+            <button data-action="publish" class="op-btn-success">Make it live</button>
+            <button data-action="discard" class="op-btn-ghost">Discard</button>
+          </div>
+          <div class="op-branch-tag">Branch: ${escapeHtml(branch)}</div>
+        `;
+        card.querySelector('[data-action="publish"]').addEventListener('click', () => publish(branch, card));
+        card.querySelector('[data-action="discard"]').addEventListener('click', () => discard(branch, card));
+        messagesEl.appendChild(card);
+        scrollToBottom();
+      }
+
+      async function applyProposal(p, card) {
+        const btn = card.querySelector('[data-action="apply"]');
+        btn.disabled = true;
+        btn.textContent = 'Applying…';
+        try {
+          const res = await fetch(`${apiBase}/commit`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              branch: state.activeBranch,
+              path: p.path,
+              oldString: p.oldString,
+              newString: p.newString,
+              summary: p.summary,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            appendStatus(data.error ?? 'Apply failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Apply';
+            return;
+          }
+          state.activeBranch = data.branch;
+          state.pendingProposal = null;
+          card.querySelector('[data-action="cancel"]').disabled = true;
+          btn.textContent = 'Applied ✓';
+          renderPreviewCard(data.previewUrl, data.branch);
+        } catch {
+          appendStatus('Network error. Try again.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Apply';
+        }
+      }
+
+      async function publish(branch, card) {
+        const btn = card.querySelector('[data-action="publish"]');
+        const discardBtn = card.querySelector('[data-action="discard"]');
+        btn.disabled = true; discardBtn.disabled = true;
+        btn.textContent = 'Publishing…';
+        try {
+          const res = await fetch(`${apiBase}/publish`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ branch }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            appendStatus(data.error ?? 'Publish failed.', 'error');
+            btn.disabled = false; discardBtn.disabled = false;
+            btn.textContent = 'Make it live';
+            return;
+          }
+          btn.textContent = 'Live ✓';
+          state.activeBranch = null;
+          appendStatus(`Published. ${productionDomain} updates in about 30 seconds.`, 'success');
+        } catch {
+          appendStatus('Network error during publish.', 'error');
+          btn.disabled = false; discardBtn.disabled = false;
+          btn.textContent = 'Make it live';
+        }
+      }
+
+      async function discard(branch, card) {
+        const btn = card.querySelector('[data-action="discard"]');
+        const pubBtn = card.querySelector('[data-action="publish"]');
+        btn.disabled = true; pubBtn.disabled = true;
+        btn.textContent = 'Discarding…';
+        try {
+          await fetch(`${apiBase}/discard`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ branch }),
+          });
+          state.activeBranch = null;
+          btn.textContent = 'Discarded';
+          appendStatus('Change discarded. Nothing was published.');
+        } catch {
+          appendStatus('Network error during discard.', 'error');
+          btn.disabled = false; pubBtn.disabled = false;
+          btn.textContent = 'Discard';
+        }
+      }
+
+      async function sendMessage(text) {
+        appendBubble('user', text);
+        state.messages.push({ role: 'user', content: text });
+        thinkingEl.classList.remove('op-hidden');
+        sendBtn.disabled = true;
+        inputEl.disabled = true;
+        try {
+          const res = await fetch(`${apiBase}/chat`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              history: state.messages.slice(0, -1),
+              message: text,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            if (data.errorCode === 'budget_exhausted') {
+              renderBudgetCard(data.resetDate);
+            } else if (data.errorCode === 'rate_limited') {
+              appendStatus(`Too many requests. Try again in about ${data.retryAfterSec ?? 30} seconds.`, 'error');
+            } else {
+              appendStatus(data.error ?? 'Chat failed.', 'error');
+            }
+            return;
+          }
+          state.messages.push({ role: 'assistant', content: data.reply });
+          appendBubble('assistant', data.reply);
+          if (data.proposal) {
+            state.pendingProposal = data.proposal;
+            renderProposal(data.proposal);
+          }
+        } catch {
+          appendStatus('Network error.', 'error');
+        } finally {
+          thinkingEl.classList.add('op-hidden');
+          sendBtn.disabled = false;
+          inputEl.disabled = false;
+          inputEl.focus();
+        }
+      }
+
+      async function uploadFile(file) {
+        appendStatus(`Uploading ${file.name}…`);
+        const fd = new FormData();
+        fd.append('file', file);
+        if (state.activeBranch) fd.append('branch', state.activeBranch);
+        try {
+          const res = await fetch(`${apiBase}/upload`, { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) {
+            appendStatus(data.error ?? 'Upload failed.', 'error');
+            return;
+          }
+          state.activeBranch = data.branch;
+          appendStatus(`Photo saved as ${data.publicUrl}. Tell me how to use it.`, 'success');
+          const noteForClaude = `I uploaded a new photo. The file path on the site is ${data.publicUrl}. Wait for me to tell you where to use it before proposing any edit.`;
+          state.messages.push({ role: 'user', content: noteForClaude });
+        } catch {
+          appendStatus('Network error during upload.', 'error');
+        }
+      }
+
+      function scrollToBottom() {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
+      function autosize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+      }
+
+      inputEl.addEventListener('input', () => autosize(inputEl));
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          formEl.requestSubmit();
+        }
+      });
+
+      formEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = inputEl.value.trim();
+        if (!text) return;
+        inputEl.value = '';
+        autosize(inputEl);
+        sendMessage(text);
+      });
+
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (file) uploadFile(file);
+        fileInput.value = '';
+      });
+
+      chatArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        chatArea.classList.add('op-drag-over');
+      });
+      chatArea.addEventListener('dragleave', () => chatArea.classList.remove('op-drag-over'));
+      chatArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        chatArea.classList.remove('op-drag-over');
+        const file = e.dataTransfer?.files?.[0];
+        if (file && file.type.startsWith('image/')) uploadFile(file);
+      });
+
+      inputEl.focus();
+    </script>
   </body>
 </html>

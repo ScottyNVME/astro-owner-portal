@@ -2,7 +2,7 @@
 
 An Astro integration that injects a Claude-powered "owner portal" into a static site, letting the site owner edit data files in natural language with a preview-then-publish flow.
 
-> **Status: v0.1.0-dev** — Phase 1 (plumbing only). Routes are stubs. Real implementations land in Phase 2/3.
+> **Status: v0.1.0-dev** — Phase 3 complete. All routes (login, chat, 6 API endpoints) are functional. Phase 4 (deploy-test on Vercel) and Phase 5 (README polish + v0.1.0 tag) are next.
 
 ## Install
 
@@ -51,6 +51,21 @@ export default defineConfig({
 Optional (auto-detected on Vercel; override if needed):
 - `VERCEL_PROJECT_NAME`
 - `VERCEL_SCOPE_SLUG`
+
+## Local development with the example app
+
+```sh
+cd examples/minimal-restaurant
+npm install
+ADMIN_PASSWORD_HASH='$2b$10$...your-bcrypt-hash...' \
+JWT_SECRET='base64-of-32-random-bytes' \
+ANTHROPIC_API_KEY='sk-...' \
+GITHUB_TOKEN='ghp_...' \
+GITHUB_REPO='owner/repo' \
+  npm run dev
+```
+
+Astro's `.env` file loading does **not** populate `process.env` for server-side reads in dev. Either export the variables in your shell (as above) or use a tool like `dotenv-cli`. On Vercel, project env vars land in `process.env` automatically.
 
 ## Development
 

@@ -1,21 +1,83 @@
 import type { APIRoute } from 'astro';
 import config from 'virtual:owner-portal/config';
+import { readSession } from '../../lib/auth.js';
+import { isWritable, isFieldEditAllowed } from '../../lib/allowlist.js';
+import { createBranch, commitEdit, generateBranchName, previewUrlFor } from '../../lib/github.js';
 
 export const prerender = false;
 
-export const GET: APIRoute = () =>
-  new Response(
-    JSON.stringify({
-      route: 'commit',
-      phase: 1,
-      branchPrefix: config.branchPrefix,
-      writable: config.allowedFiles.map((f) => f.path),
-    }),
-    { status: 200, headers: { 'content-type': 'application/json' } },
-  );
+type ApplyBody = {
+  branch?: string;
+  path: string;
+  oldString: string;
+  newString: string;
+  summary: string;
+};
 
-export const POST: APIRoute = () =>
-  new Response(
-    JSON.stringify({ route: 'commit', phase: 1, message: 'Commit endpoint stub. Phase 3 wires GitHub.' }),
-    { status: 501, headers: { 'content-type': 'application/json' } },
-  );
+export const POST: APIRoute = async ({ request, cookies }) => {
+  if (!(await readSession(cookies))) {
+    return new Response(JSON.stringify({ error: 'Unauthorized.' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  let body: ApplyBody;
+  try {
+    body = (await request.json()) as ApplyBody;
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON.' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  if (!isWritable(body.path)) {
+    return new Response(
+      JSON.stringify({ error: `Cannot edit ${body.path} from the owner portal.` }),
+      { status: 403, headers: { 'content-type': 'application/json' } },
+    );
+  }
+
+  // Per-field guard for files that declare allowedFields.
+  const entry = config.allowedFiles.find((f) => f.path === body.path);
+  if (entry?.allowedFields) {
+    const check = isFieldEditAllowed(body.path, body.oldString, body.newString);
+    if (!check.ok) {
+      return new Response(JSON.stringify({ error: check.reason ?? 'Field not editable.' }), {
+        status: 403,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+  }
+
+  try {
+    const branch = body.branch ?? generateBranchName();
+    if (!body.branch) {
+      await createBranch(branch);
+    }
+
+    await commitEdit({
+      branch,
+      path: body.path,
+      oldString: body.oldString,
+      newString: body.newString,
+      message: `Owner portal: ${body.summary}`,
+    });
+
+    return new Response(
+      JSON.stringify({
+        branch,
+        previewUrl: previewUrlFor(branch),
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  } catch (err) {
+    console.error('[owner-portal] commit error:', err);
+    const reason = err instanceof Error ? err.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: reason }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+};
