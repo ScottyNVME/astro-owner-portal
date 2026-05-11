@@ -1,0 +1,16 @@
+/*
+ * Default theme for @scottynvme/owner-portal.
+ * Clients can override by passing brand.themeCss in the integration config.
+ * Phase 1: placeholder variables; Phase 3 wires these into the page templates.
+ */
+:root {
+  --op-accent: #c0532b;
+  --op-accent-dark: #9b3f1c;
+  --op-bg: #fbf6ec;
+  --op-bg-soft: #f3ead8;
+  --op-text: #2a1a10;
+  --op-text-soft: #6b5343;
+  --op-success: #2d5e3e;
+  --op-danger: #b22222;
+  --op-border: rgba(0, 0, 0, 0.08);
+}

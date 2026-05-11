@@ -1,0 +1,20 @@
+---
+import config from 'virtual:owner-portal/config';
+export const prerender = false;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Owner Portal · {config.brand.name}</title>
+  </head>
+  <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem;">
+    <h1>Owner Portal (stub)</h1>
+    <p><strong>{config.brand.name}</strong> · mounted at <code>{config.adminPath}</code></p>
+    <p>Phase 1 plumbing only. Real login form lands in Phase 3.</p>
+    <h2>Resolved config</h2>
+    <pre style="background: #f4f4f4; padding: 1rem; border-radius: 8px; overflow: auto;">{JSON.stringify(config, null, 2)}</pre>
+  </body>
+</html>

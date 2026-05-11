@@ -1,0 +1,46 @@
+{
+  "name": "@scottynvme/owner-portal",
+  "version": "0.1.0-dev",
+  "description": "Astro integration that injects a Claude-powered owner-edit portal into a static site",
+  "type": "module",
+  "license": "MIT",
+  "author": "Scott Avedis <scott.avedis@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottynvme/astro-owner-portal.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && node ./scripts/copy-assets.mjs",
+    "prepare": "npm run build",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "astro": "^6.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.1",
+    "@octokit/rest": "^22.0.1",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.3",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "astro": "^6.2.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  }
+}

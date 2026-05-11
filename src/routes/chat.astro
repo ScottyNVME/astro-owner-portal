@@ -1,0 +1,26 @@
+---
+import config from 'virtual:owner-portal/config';
+export const prerender = false;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Owner Chat · {config.brand.name}</title>
+  </head>
+  <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem;">
+    <h1>Owner Chat (stub)</h1>
+    <p><strong>{config.brand.name}</strong> · chat UI lands in Phase 3.</p>
+    <p>Allowed files for this site:</p>
+    <ul>
+      {config.allowedFiles.map((f) => (
+        <li>
+          <code>{f.path}</code>
+          {f.allowedFields ? ` — fields: ${f.allowedFields.join(', ')}` : ' (full file)'}
+        </li>
+      ))}
+    </ul>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "minimal-restaurant",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@scottynvme/owner-portal": "file:../..",
+    "astro": "^6.2.2"
+  }
+}
