@@ -1,15 +1,24 @@
 # Changelog
 
-## 0.1.0-dev — unreleased
+## 0.1.0 — 2026-05-10
 
-### Phase 3 (current)
-- All 6 API endpoints functional: auth (bcrypt + JWT session), chat (Claude tool-use loop), commit (allowlist + GitHub commit), publish (merge to main + delete branch), discard (delete branch), upload (sharp resize + commit binary).
-- login.astro and chat.astro fully ported with vanilla-CSS theme. Brand accent color flows from `config.brand.accentColor` through inline `<style>:root{--op-accent:…}</style>`. Optional `config.brand.themeCss` injected via `<link>` after defaults.
-- Per-site values injected into client JS via Astro's `define:vars` (apiBase, productionDomain, contactInfo).
-- End-to-end smoke-tested: real session flow with bcrypt-hashed password, cookie issue/read, route guards, allowlist enforcement, branch-name regex enforcement. Anthropic/GitHub errors surface at the right layer.
+First release. Astro integration that mounts a Claude-powered owner-portal under a configurable `adminPath`. Extracted from the inline implementation in `ScottyNVME/baan-khun-restaurant` (Mi Bella Ilución).
 
-### Phase 2
-- Libs ported (auth/claude/github/allowlist), parameterized via `virtual:owner-portal/config`. Cookie `op_session`. Allowlist whitelist-only (banlist dropped). System prompt = base + auto-listed scope + `systemPromptExtra`.
+### Features
+- Drop-in install via `npm install github:scottynvme/astro-owner-portal#v0.1.0` — no registry needed; `prepare` builds on install.
+- One config object in `astro.config.mjs` drives everything: per-site brand, allowed files (with optional per-field whitelist), image upload directory, branch prefix, model, system-prompt extras.
+- 8 routes auto-injected under `${adminPath}`: login, chat, and 6 API endpoints (`auth`, `chat`, `commit`, `publish`, `discard`, `upload`).
+- Auth: bcrypt password + JWT in `httpOnly` cookie, in-memory IP rate-limit.
+- Tool-use chat with `read_file` and `propose_edit`. Friendly UI cards for proposals, previews, budget-exhausted, and rate-limited states.
+- Image uploads via drag-drop: sharp resize to configured max width, WebP, committed to the draft branch alongside text edits.
+- Server-side allowlist enforces path scope and optional per-field scope even if Claude is prompt-injected.
+- Predictable Vercel preview URLs auto-derived from `GITHUB_REPO` + Vercel system env vars.
+- Vanilla-CSS theme with `--op-*` variables. Brand accent color and optional full theme override flow from config.
 
-### Phase 1
-- Astro integration plumbing: validates options, injects 8 routes under `${adminPath}`, exposes `virtual:owner-portal/config` via Vite plugin, tsup ESM + .d.ts build, `prepare`-based git-tag distribution.
+### Stack constraints
+- Astro `^6.0.0` (peer dep)
+- Vercel adapter (any version with Vercel Build Output API support)
+- Node `>=22.12.0`
+
+### Known gotchas
+- Astro dev mode does not populate `process.env` from `.env` files for server-side reads. Export env vars in shell or use `dotenv-cli`. Production on Vercel is unaffected.

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@scottynvme/owner-portal": "file:../..",
+    "@astrojs/vercel": "^10.0.6",
     "astro": "^6.2.2"
   }
 }
