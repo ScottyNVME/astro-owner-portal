@@ -8,7 +8,7 @@ const root = join(__dirname, '..');
 const src = join(root, 'src');
 const dist = join(root, 'dist');
 
-const targets = ['routes', 'styles'];
+const targets = ['routes', 'styles', 'lib'];
 
 for (const t of targets) {
   const srcDir = join(src, t);
