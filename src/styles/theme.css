@@ -6,17 +6,17 @@
  */
 
 :root {
-  /* brand-tunable */
-  --op-accent: #c0532b;
-  --op-accent-dark: #9b3f1c;
+  /* brand-tunable (override via brand.accentColor or a full brand.themeCss) */
+  --op-accent: #475569;
+  --op-accent-dark: #334155;
 
   /* neutrals (overridable by themeCss) */
-  --op-bg: #fbf6ec;
-  --op-bg-soft: #f3ead8;
+  --op-bg: #f8fafc;
+  --op-bg-soft: #f1f5f9;
   --op-surface: #ffffff;
-  --op-text: #2a1a10;
-  --op-text-soft: #6b5343;
-  --op-border: rgba(0, 0, 0, 0.08);
+  --op-text: #0f172a;
+  --op-text-soft: #475569;
+  --op-border: rgba(15, 23, 42, 0.10);
 
   /* status colors */
   --op-success: #2d5e3e;

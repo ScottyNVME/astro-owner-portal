@@ -7,24 +7,24 @@ export default defineConfig({
   adapter: vercel(),
   integrations: [
     ownerPortal({
-      adminPath: '/pascual',
+      adminPath: '/studio',
       brand: {
-        name: 'Example Restaurant',
+        name: 'Example Business',
         logo: '/img/logo.png',
-        accentColor: '#c0532b',
+        accentColor: '#475569',
       },
       allowedFiles: [
-        { path: 'src/data/menu.ts' },
-        { path: 'src/data/restaurant.ts', allowedFields: ['hours', 'hoursDisplay', 'phones'] },
+        { path: 'src/data/content.ts' },
+        { path: 'src/data/site.ts', allowedFields: ['hours', 'hoursDisplay', 'phones'] },
       ],
-      imageUploadDir: 'public/img/food',
+      imageUploadDir: 'public/img/uploads',
       productionDomain: 'www.example.com',
-      contactInfo: 'Text Scott',
+      contactInfo: 'Text the site owner',
       systemPromptExtra: `Data shapes for this site:
 
-src/data/menu.ts exports a \`menu\` array of categories. Each category has { id, title, image, items[] }. Items are { name, price, description }. Prices are strings like "15.00" with two decimals, no $ sign.
+src/data/content.ts exports a \`content\` array of sections. Each section has { id, title, items[] }. Items are { name, detail }.
 
-src/data/restaurant.ts exports a \`restaurant\` object. Owners may only edit:
+src/data/site.ts exports a \`site\` object. Owners may only edit:
 - hours: weekday → time string map
 - hoursDisplay: { label, value } shown in the header
 - phones: array of { label, number (E.164), display (human-friendly) }`,

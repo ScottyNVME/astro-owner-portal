@@ -21,7 +21,7 @@ function clientIp(request: Request): string {
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const ip = clientIp(request);
 
-  if (isRateLimited(ip)) {
+  if (await isRateLimited(ip)) {
     return new Response(
       JSON.stringify({ error: 'Too many attempts. Wait 15 minutes and try again.' }),
       { status: 429, headers: { 'content-type': 'application/json' } },
@@ -57,14 +57,14 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   }
 
   if (!ok) {
-    recordFailedAttempt(ip);
+    await recordFailedAttempt(ip);
     return new Response(JSON.stringify({ error: 'Incorrect password.' }), {
       status: 401,
       headers: { 'content-type': 'application/json' },
     });
   }
 
-  resetAttempts(ip);
+  await resetAttempts(ip);
   await issueSession(cookies);
 
   const nextUrl = `${config.adminPath}/chat`;

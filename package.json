@@ -1,6 +1,6 @@
 {
   "name": "@scottynvme/owner-portal",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Astro integration that injects a Claude-powered owner-edit portal into a static site",
   "type": "module",
   "license": "MIT",
@@ -21,11 +21,18 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup && node ./scripts/copy-assets.mjs",
     "prepare": "npm run build",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "release": "changeset publish"
   },
   "peerDependencies": {
     "astro": "^6.0.0"
@@ -35,12 +42,20 @@
     "@octokit/rest": "^22.0.1",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
-    "sharp": "^0.33.0"
+    "picomatch": "^4.0.2",
+    "sharp": "^0.33.0",
+    "zod": "^3.24.1"
+  },
+  "optionalDependencies": {
+    "@upstash/redis": "^1.34.3"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.27.11",
     "@types/node": "^22.10.0",
+    "@types/picomatch": "^3.0.1",
     "astro": "^6.2.2",
     "tsup": "^8.3.5",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
   }
 }

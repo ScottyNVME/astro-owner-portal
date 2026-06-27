@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import sharp from 'sharp';
 import config from 'virtual:owner-portal/config';
 import { readSession } from '../../lib/auth.js';
-import { createBranch, commitBinary, generateBranchName, previewUrlFor } from '../../lib/github.js';
+import { commitBinary } from '../../lib/github.js';
 
 export const prerender = false;
 
@@ -59,7 +59,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     );
   }
 
-  const existingBranch = (form.get('branch') as string | null) ?? null;
   const uploadDir = config.imageUploadDir.replace(/\/$/, '');
   const publicPrefix = uploadDir.replace(/^public\//, '');
 
@@ -75,11 +74,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const path = `${uploadDir}/${filename}`;
     const publicUrl = `/${publicPrefix}/${filename}`;
 
-    const branch = existingBranch ?? generateBranchName();
-    if (!existingBranch) await createBranch(branch);
-
     await commitBinary({
-      branch,
       path,
       content: outputBuf,
       message: `Owner portal: upload ${filename}`,
@@ -87,10 +82,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     return new Response(
       JSON.stringify({
-        branch,
         path,
         publicUrl,
-        previewUrl: previewUrlFor(branch),
         size: outputBuf.length,
       }),
       { status: 200, headers: { 'content-type': 'application/json' } },

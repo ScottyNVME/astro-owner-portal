@@ -59,10 +59,10 @@ const allowedScopeLine = config.allowedFiles
         <div class="op-welcome">
           <div class="op-welcome-title">Hello. What needs updating?</div>
           <p class="op-welcome-body">
-            Tell me what you want to change in plain English. I'll show you a diff before anything goes live. You can also drag a photo onto this window.
+            Tell me what you want to change in plain English. I'll show you the exact change to approve before it goes live, and you can undo the last change anytime. You can also drag a photo onto this window.
           </p>
           <p class="op-welcome-footnote">
-            Editable on this site: <strong>{allowedScopeLine}</strong>. Every change gets a preview link before publishing.
+            Editable on this site: <strong>{allowedScopeLine}</strong>. Approved changes go live in about 30 seconds.
           </p>
         </div>
 
@@ -97,7 +97,6 @@ const allowedScopeLine = config.allowedFiles
       const state = {
         messages: [],
         pendingProposal: null,
-        activeBranch: null,
       };
 
       const $ = (id) => document.getElementById(id);
@@ -187,21 +186,17 @@ const allowedScopeLine = config.allowedFiles
         inputEl.placeholder = 'Chat paused until the budget resets.';
       }
 
-      function renderPreviewCard(previewUrl, branch) {
+      function renderPublishedCard(summary) {
         const card = document.createElement('div');
         card.className = 'op-preview-card';
         card.innerHTML = `
-          <div class="op-preview-title">Preview is building</div>
-          <p class="op-preview-body">Give it about 30–60 seconds. Open the preview, check the change, then publish or discard.</p>
+          <div class="op-preview-title">Change is live ✓</div>
+          <p class="op-preview-body">${escapeHtml(productionDomain)} updates in about 30 seconds. Changed your mind?</p>
           <div class="op-preview-actions">
-            <a href="${escapeHtml(previewUrl)}" target="_blank" rel="noopener noreferrer" class="op-link-btn">Open preview ↗</a>
-            <button data-action="publish" class="op-btn-success">Make it live</button>
-            <button data-action="discard" class="op-btn-ghost">Discard</button>
+            <button data-action="undo" class="op-btn-ghost">Undo this change</button>
           </div>
-          <div class="op-branch-tag">Branch: ${escapeHtml(branch)}</div>
         `;
-        card.querySelector('[data-action="publish"]').addEventListener('click', () => publish(branch, card));
-        card.querySelector('[data-action="discard"]').addEventListener('click', () => discard(branch, card));
+        card.querySelector('[data-action="undo"]').addEventListener('click', () => undoLast(card));
         messagesEl.appendChild(card);
         scrollToBottom();
       }
@@ -215,7 +210,6 @@ const allowedScopeLine = config.allowedFiles
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
-              branch: state.activeBranch,
               path: p.path,
               oldString: p.oldString,
               newString: p.newString,
@@ -229,11 +223,10 @@ const allowedScopeLine = config.allowedFiles
             btn.textContent = 'Apply';
             return;
           }
-          state.activeBranch = data.branch;
           state.pendingProposal = null;
           card.querySelector('[data-action="cancel"]').disabled = true;
           btn.textContent = 'Applied ✓';
-          renderPreviewCard(data.previewUrl, data.branch);
+          renderPublishedCard(p.summary);
         } catch {
           appendStatus('Network error. Try again.', 'error');
           btn.disabled = false;
@@ -241,52 +234,32 @@ const allowedScopeLine = config.allowedFiles
         }
       }
 
-      async function publish(branch, card) {
-        const btn = card.querySelector('[data-action="publish"]');
-        const discardBtn = card.querySelector('[data-action="discard"]');
-        btn.disabled = true; discardBtn.disabled = true;
-        btn.textContent = 'Publishing…';
+      async function undoLast(card) {
+        const btn = card.querySelector('[data-action="undo"]');
+        btn.disabled = true;
+        btn.textContent = 'Undoing…';
         try {
-          const res = await fetch(`${apiBase}/publish`, {
+          const res = await fetch(`${apiBase}/revert`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ branch }),
+            body: JSON.stringify({}),
           });
           const data = await res.json();
           if (!res.ok) {
-            appendStatus(data.error ?? 'Publish failed.', 'error');
-            btn.disabled = false; discardBtn.disabled = false;
-            btn.textContent = 'Make it live';
+            appendStatus(data.error ?? 'Undo failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Undo this change';
             return;
           }
-          btn.textContent = 'Live ✓';
-          state.activeBranch = null;
-          appendStatus(`Published. ${productionDomain} updates in about 30 seconds.`, 'success');
+          btn.textContent = 'Undone ✓';
+          appendStatus(
+            `Reverted "${data.revertedSummary ?? 'last change'}". ${productionDomain} updates in about 30 seconds.`,
+            'success',
+          );
         } catch {
-          appendStatus('Network error during publish.', 'error');
-          btn.disabled = false; discardBtn.disabled = false;
-          btn.textContent = 'Make it live';
-        }
-      }
-
-      async function discard(branch, card) {
-        const btn = card.querySelector('[data-action="discard"]');
-        const pubBtn = card.querySelector('[data-action="publish"]');
-        btn.disabled = true; pubBtn.disabled = true;
-        btn.textContent = 'Discarding…';
-        try {
-          await fetch(`${apiBase}/discard`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ branch }),
-          });
-          state.activeBranch = null;
-          btn.textContent = 'Discarded';
-          appendStatus('Change discarded. Nothing was published.');
-        } catch {
-          appendStatus('Network error during discard.', 'error');
-          btn.disabled = false; pubBtn.disabled = false;
-          btn.textContent = 'Discard';
+          appendStatus('Network error during undo.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Undo this change';
         }
       }
 
@@ -336,7 +309,6 @@ const allowedScopeLine = config.allowedFiles
         appendStatus(`Uploading ${file.name}…`);
         const fd = new FormData();
         fd.append('file', file);
-        if (state.activeBranch) fd.append('branch', state.activeBranch);
         try {
           const res = await fetch(`${apiBase}/upload`, { method: 'POST', body: fd });
           const data = await res.json();
@@ -344,8 +316,7 @@ const allowedScopeLine = config.allowedFiles
             appendStatus(data.error ?? 'Upload failed.', 'error');
             return;
           }
-          state.activeBranch = data.branch;
-          appendStatus(`Photo saved as ${data.publicUrl}. Tell me how to use it.`, 'success');
+          appendStatus(`Photo uploaded to ${data.publicUrl}. Tell me where to use it.`, 'success');
           const noteForClaude = `I uploaded a new photo. The file path on the site is ${data.publicUrl}. Wait for me to tell you where to use it before proposing any edit.`;
           state.messages.push({ role: 'user', content: noteForClaude });
         } catch {

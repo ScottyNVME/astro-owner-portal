@@ -1,0 +1,49 @@
+---
+import { site } from '../data/site';
+import { content } from '../data/content';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{site.name}</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #0f172a; }
+      h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+      .tagline { color: #475569; margin-top: 0; }
+      .hours { background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; }
+      .section { margin-top: 2rem; }
+      .item { padding: 0.5rem 0; border-bottom: 1px solid rgba(15,23,42,0.06); }
+      .item-name { font-weight: 600; }
+      .item-detail { color: #475569; font-size: 0.875rem; }
+      .footer { margin-top: 3rem; font-size: 0.875rem; color: #475569; }
+      .footer a { color: #475569; }
+    </style>
+  </head>
+  <body>
+    <h1>{site.name}</h1>
+    <p class="tagline">{site.tagline}</p>
+
+    <div class="hours">
+      <strong>{site.hoursDisplay.label}:</strong> {site.hoursDisplay.value}
+      &nbsp;·&nbsp; {site.phones[0].display}
+    </div>
+
+    {content.map((section) => (
+      <section class="section">
+        <h2>{section.title}</h2>
+        {section.items.map((it) => (
+          <div class="item">
+            <div class="item-name">{it.name}</div>
+            <div class="item-detail">{it.detail}</div>
+          </div>
+        ))}
+      </section>
+    ))}
+
+    <p class="footer">
+      Owner: <a href="/studio">sign in to make changes</a>.
+    </p>
+  </body>
+</html>

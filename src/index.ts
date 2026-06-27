@@ -11,9 +11,9 @@ const ROUTE_FILES = [
   { sub: '/api/auth', file: 'api/auth.ts' },
   { sub: '/api/chat', file: 'api/chat.ts' },
   { sub: '/api/commit', file: 'api/commit.ts' },
-  { sub: '/api/publish', file: 'api/publish.ts' },
-  { sub: '/api/discard', file: 'api/discard.ts' },
   { sub: '/api/upload', file: 'api/upload.ts' },
+  { sub: '/api/revert', file: 'api/revert.ts' },
+  { sub: '/api/health', file: 'api/health.ts' },
 ];
 
 export default function ownerPortal(rawOptions: OwnerPortalOptions): AstroIntegration {
@@ -45,4 +45,5 @@ export default function ownerPortal(rawOptions: OwnerPortalOptions): AstroIntegr
   };
 }
 
+export { defineOwnerPortalConfig, presets } from './config.js';
 export type { OwnerPortalOptions, AllowedFile, BrandConfig } from './config.js';

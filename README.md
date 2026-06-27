@@ -1,21 +1,23 @@
 # @scottynvme/owner-portal
 
-An Astro integration that adds a Claude-powered "owner portal" to a static site. The site owner signs in at a private URL, types changes in plain English ("change carnitas to $16", "update Friday hours to 11–10"), Claude proposes a precise edit, the owner approves on a Vercel preview, and clicks **Make it live** to merge to `main`. Server-side allowlists prevent edits outside a configured scope.
+An Astro integration that adds a Claude-powered "owner portal" to a static site. The site owner signs in at a private URL, types changes in plain English ("update Friday hours to 9–5", "change the homepage headline"), Claude proposes a precise edit, the owner approves the diff, and it goes live, with one-click undo. Server-side allowlists prevent edits outside a configured scope.
 
 Designed for: a freelance web consultant who builds simple sites for small businesses and wants those clients to self-serve content changes — without giving them code, a CMS, or a learning curve.
 
 - One `npm install`, ~15 lines of config — no client-side runtime, no CMS, no database.
 - Per-site scope (allowed files + per-field whitelist) declared at integration time.
-- Preview-then-publish flow with predictable Vercel preview URLs.
+- Approve-the-diff-then-live, with one-click undo. No preview deploys to manage.
 - Image uploads (drag-drop) auto-resized to WebP and committed alongside text edits.
 
 ## Install
 
 ```sh
-npm install github:scottynvme/astro-owner-portal#v0.1.0
-```
+# from npm (once published — preferred: prebuilt, reproducible, zero-auth)
+npm install @scottynvme/owner-portal
 
-`npm` will clone the tag and run a `prepare` build automatically. No registry, no token, no npm publishing.
+# or straight from a git tag (no npm publish needed; npm runs the prepare build on install)
+npm install github:scottynvme/astro-owner-portal#v0.2.0
+```
 
 ## Configure
 
@@ -30,19 +32,19 @@ export default defineConfig({
   adapter: vercel(),
   integrations: [
     ownerPortal({
-      adminPath: '/pascual',
+      adminPath: '/studio',
       brand: {
-        name: 'Mi Bella Ilución',
-        logo: '/img/decor/logo.jpg',
-        accentColor: '#c0532b',
+        name: 'Example Business',
+        logo: '/img/logo.png',
+        accentColor: '#475569',
       },
       allowedFiles: [
-        { path: 'src/data/menu.ts' },
-        { path: 'src/data/restaurant.ts', allowedFields: ['hours', 'hoursDisplay', 'phones'] },
+        { path: 'src/data/content.ts' },
+        { path: 'src/data/site.ts', allowedFields: ['hours', 'hoursDisplay', 'phones'] },
       ],
-      imageUploadDir: 'public/img/food',
-      productionDomain: 'www.mibellailucion.com',
-      contactInfo: 'Text Scott',
+      imageUploadDir: 'public/img/uploads',
+      productionDomain: 'www.example.com',
+      contactInfo: 'Text the site owner',
       systemPromptExtra: '…describe your data shapes to Claude here…',
     }),
   ],
@@ -63,9 +65,8 @@ Set these in each client's Vercel project (Settings → Environment Variables). 
 | `GITHUB_TOKEN` | fine-grained PAT, **Contents: read & write** on the client's repo only |
 | `GITHUB_REPO` | `owner/repo` — the GitHub repo Vercel deploys from |
 
-Optional (auto-detected on Vercel from system env vars; override only if the auto-detect is wrong):
-- `VERCEL_PROJECT_NAME`
-- `VERCEL_SCOPE_SLUG`
+Optional (for durable login rate-limiting across serverless instances — recommended for an internet-exposed admin). Without these, rate-limiting falls back to in-memory (per function instance):
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or Vercel KV's `KV_REST_API_URL` / `KV_REST_API_TOKEN`)
 
 ### Generating the credentials
 
@@ -84,14 +85,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 | `adminPath` | `string` | (required) | Path the portal mounts at. Must start with `/`, no trailing slash |
 | `brand.name` | `string` | (required) | Shown in page title and chat header |
 | `brand.logo` | `string` | (required) | Site-rooted path or absolute URL |
-| `brand.accentColor` | `string` | `#c0532b` | Any CSS color. `--op-accent-dark` derived via `color-mix` |
+| `brand.accentColor` | `string` | `#475569` | Any CSS color. `--op-accent-dark` derived via `color-mix` |
 | `brand.themeCss` | `string` | undefined | Site-rooted path to an extra CSS file `<link>`'d after defaults |
 | `allowedFiles` | `AllowedFile[]` | (required) | `[{ path, allowedFields? }]`. Without `allowedFields`, the file is fully editable. With it, edits must touch at least one named field |
-| `imageUploadDir` | `string` | (required) | e.g. `'public/img/food'`. Where uploads commit |
+| `imageUploadDir` | `string` | (required) | e.g. `'public/img/uploads'`. Where uploads commit |
 | `imageMaxWidth` | `number` | `1200` | sharp resize cap |
 | `systemPromptExtra` | `string` | `''` | Appended to the base system prompt. Describe your data shapes here |
-| `branchPrefix` | `string` | `'owner-edit'` | Branch names are `{prefix}-{YYYYMMDD-HHMMSS}` UTC |
-| `productionDomain` | `string` | (required) | Shown to the owner in the "Published, updates in ~30s" status |
+| `productionDomain` | `string` | (required) | Shown to the owner in the "Change is live, updates in ~30s" status |
 | `contactInfo` | `string` | (required) | Shown on the budget-exhausted card ("Text Scott", "Email support@…") |
 | `model` | `string` | `'claude-sonnet-4-6'` | Any Anthropic model id |
 
@@ -103,9 +103,9 @@ For larger overrides, set `brand.themeCss` to a site-rooted path. Place the file
 
 ```ts
 brand: {
-  name: 'Mi Bella Ilución',
-  logo: '/img/decor/logo.jpg',
-  accentColor: '#c0532b',
+  name: 'Example Business',
+  logo: '/img/logo.png',
+  accentColor: '#475569',
   themeCss: '/owner-portal-theme.css',
 },
 ```
@@ -138,7 +138,7 @@ On Vercel, project env vars land in `process.env` automatically.
 
 ## Deploy to Vercel
 
-End-to-end recipe in [examples/minimal-restaurant/README.md](examples/minimal-restaurant/README.md). Short version: push the host site to GitHub, import the repo in Vercel, set the five env vars above. The Vercel adapter generates a single `_render.func` serverless function for all owner-portal routes; the rest of your site stays static.
+End-to-end recipe in [examples/minimal/README.md](examples/minimal/README.md). Short version: push the host site to GitHub, import the repo in Vercel, set the five env vars above. The Vercel adapter generates a single `_render.func` serverless function for all owner-portal routes; the rest of your site stays static.
 
 ## How it works
 
@@ -146,12 +146,13 @@ End-to-end recipe in [examples/minimal-restaurant/README.md](examples/minimal-re
 2. Owner types a request. The server runs Claude with a tool-use loop:
    - `read_file(path)` — fetches the current file via the GitHub API.
    - `propose_edit(path, old_string, new_string, summary)` — returns a proposal record.
-3. The proposal renders as a red/green diff. Owner clicks **Apply**.
-4. Server validates against the allowlist, then commits the edit to a draft branch `{branchPrefix}-{UTC-timestamp}`.
-5. Vercel auto-builds a preview at the predictable branch URL. Owner clicks **Open preview**, then **Make it live**.
-6. Server merges the branch into `main` and deletes it. Vercel redeploys production. Done.
+3. The proposal renders as a red/green diff. Owner reviews it and clicks **Apply**.
+4. Server validates against the allowlist (path + optional per-field whitelist) and commits the edit **directly to `main`**. Vercel redeploys production (~30s).
+5. A "Change is live" card offers **Undo this change** — one click commits a revert that restores the previous state (also live in ~30s). For a deeper rollback, use Vercel's Instant Rollback.
 
-Image uploads work the same way: drag a photo into the chat → server resizes to WebP via `sharp` → commits to the same draft branch → owner sees the new path and tells Claude where to use it.
+A build-breaking edit can't take the site down: Vercel won't promote a failing build, so production stays on the last good deploy. The in-chat diff is the review step (no separate preview deploy).
+
+Image uploads work the same way: drag a photo into the chat → server resizes to WebP via `sharp` → commits to `main` → owner sees the new path and tells Claude where to use it.
 
 ## Security
 
@@ -174,7 +175,7 @@ npm run typecheck
 npm run dev         # tsup --watch (for iterating on the integration itself)
 ```
 
-The [examples/minimal-restaurant](examples/minimal-restaurant) directory is the smoke-test consumer. Build it with `npm run build` inside that directory; inspect `.vercel/output/` to see what Vercel will deploy.
+The [examples/minimal](examples/minimal) directory is the smoke-test consumer. Build it with `npm run build` inside that directory; inspect `.vercel/output/` to see what Vercel will deploy.
 
 ## License
 

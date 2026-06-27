@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import config from 'virtual:owner-portal/config';
 import { isReadable, isWritable } from './allowlist.js';
-import { readFile } from './github.js';
+import { readFile, listFiles } from './github.js';
 
 const MAX_TOKENS = 2048;
 const MAX_TOOL_ITERATIONS = 8;
@@ -17,19 +17,21 @@ function buildSystemPrompt(): string {
 
   const base = `You are the owner portal assistant for the ${config.brand.name} website.
 
-Your job is to help the site owner update their site by editing files via two tools:
+Your job is to help the site owner update their site by editing files via these tools:
+- list_files() — list the actual files you may edit (resolves any glob patterns below to concrete paths)
 - read_file(path) — fetch the current contents of an allowed file
 - propose_edit(path, old_string, new_string, summary) — propose a precise text edit. The owner sees a diff and chooses Apply or Cancel. old_string MUST match the file exactly (including whitespace and surrounding context for uniqueness). new_string is the replacement.
 
 How to work:
-1. When the owner asks for a change, ALWAYS call read_file first to see current contents.
-2. Find the exact text to change. Include enough surrounding context in old_string so the match is unique within the file.
-3. Call propose_edit ONCE per turn with a plain-English summary describing the change.
-4. After proposing, the owner will apply or cancel. Don't propose multiple edits at once.
-5. If unclear (which item? which field?), ASK before proposing.
-6. Refuse edits to anything outside the allowed scope below. Politely explain the limit.
+1. If you're unsure of the exact path (or the scope below lists a glob like "**/*.md"), call list_files first to find the right file.
+2. Call read_file to see current contents before proposing anything.
+3. Find the exact text to change. Include enough surrounding context in old_string so the match is unique within the file.
+4. Call propose_edit ONCE per turn with a plain-English summary describing the change.
+5. After proposing, the owner will apply or cancel. Don't propose multiple edits at once.
+6. If unclear (which item? which field?), ASK before proposing.
+7. Refuse edits to anything outside the allowed scope below. Politely explain the limit.
 
-Allowed scope for this site:
+Allowed scope for this site (entries with "*" are globs — use list_files to expand them):
 ${scopeLines}
 
 Style: concise, friendly, and appropriate for a small-business owner. No code blocks unless showing literal file content. Don't expose internal field names if a natural-language label exists.`;
@@ -38,6 +40,15 @@ Style: concise, friendly, and appropriate for a small-business owner. No code bl
 }
 
 const TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'list_files',
+    description:
+      'List the files you are allowed to edit. Resolves any glob patterns in the allowed scope to concrete file paths. Use this first when you do not know the exact path of the file the owner means.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
   {
     name: 'read_file',
     description: 'Read the current contents of an allowed source file. Returns the full file text.',
@@ -142,6 +153,17 @@ function getClient(): Anthropic {
 }
 
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
+  if (name === 'list_files') {
+    try {
+      const editable = (await listFiles()).filter((p) => isReadable(p));
+      return editable.length
+        ? `Editable files:\n${editable.join('\n')}`
+        : 'No editable files found in the allowed scope.';
+    } catch (err) {
+      return `ERROR listing files: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
   if (name === 'read_file') {
     const path = String(input.path ?? '');
     if (!isReadable(path)) {

@@ -48,32 +48,94 @@ export function clearSession(cookies: AstroCookies): void {
   cookies.delete(COOKIE_NAME, { path: '/' });
 }
 
-// In-memory login attempt tracker. Survives the lifetime of a single Vercel
-// function instance — enough to deter brute force on a shared password. If
-// stronger guarantees are needed later, move to Vercel KV.
-const failedAttempts = new Map<string, { count: number; firstAttempt: number }>();
+// ── Login rate limiting ──────────────────────────────────────────────────
+// Durable when an Upstash/Vercel-KV REST endpoint is configured (recommended,
+// since Vercel function instances are ephemeral so an in-memory counter resets
+// constantly). Falls back to in-memory with a one-time warning otherwise.
 const MAX_ATTEMPTS = 5;
-const WINDOW_MS = 15 * 60 * 1000;
+const WINDOW_SEC = 15 * 60;
 
-export function isRateLimited(ip: string): boolean {
-  const entry = failedAttempts.get(ip);
-  if (!entry) return false;
-  if (Date.now() - entry.firstAttempt > WINDOW_MS) {
-    failedAttempts.delete(ip);
-    return false;
-  }
-  return entry.count >= MAX_ATTEMPTS;
+type RateStore = {
+  fails(ip: string): Promise<number>;
+  bump(ip: string): Promise<void>;
+  reset(ip: string): Promise<void>;
+};
+
+function memoryStore(): RateStore {
+  const map = new Map<string, { count: number; firstAttempt: number }>();
+  const windowMs = WINDOW_SEC * 1000;
+  return {
+    async fails(ip) {
+      const e = map.get(ip);
+      if (!e) return 0;
+      if (Date.now() - e.firstAttempt > windowMs) {
+        map.delete(ip);
+        return 0;
+      }
+      return e.count;
+    },
+    async bump(ip) {
+      const e = map.get(ip);
+      if (!e || Date.now() - e.firstAttempt > windowMs) {
+        map.set(ip, { count: 1, firstAttempt: Date.now() });
+      } else {
+        e.count += 1;
+      }
+    },
+    async reset(ip) {
+      map.delete(ip);
+    },
+  };
 }
 
-export function recordFailedAttempt(ip: string): void {
-  const entry = failedAttempts.get(ip);
-  if (!entry || Date.now() - entry.firstAttempt > WINDOW_MS) {
-    failedAttempts.set(ip, { count: 1, firstAttempt: Date.now() });
-  } else {
-    entry.count += 1;
-  }
+let storePromise: Promise<RateStore> | null = null;
+function getStore(): Promise<RateStore> {
+  if (storePromise) return storePromise;
+  storePromise = (async () => {
+    const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+    if (url && token) {
+      try {
+        const { Redis } = await import('@upstash/redis');
+        const redis = new Redis({ url, token });
+        const key = (ip: string) => `op:fail:${ip}`;
+        return {
+          async fails(ip) {
+            return Number((await redis.get<number>(key(ip))) ?? 0);
+          },
+          async bump(ip) {
+            const k = key(ip);
+            const n = await redis.incr(k);
+            if (n === 1) await redis.expire(k, WINDOW_SEC);
+          },
+          async reset(ip) {
+            await redis.del(key(ip));
+          },
+        } satisfies RateStore;
+      } catch (err) {
+        console.warn('[owner-portal] @upstash/redis unavailable; using in-memory rate limit:', err);
+      }
+    } else {
+      console.warn(
+        '[owner-portal] No KV/Upstash REST env detected — login rate limit is in-memory (per function instance only). Add KV for durable lockout.',
+      );
+    }
+    return memoryStore();
+  })();
+  return storePromise;
 }
 
-export function resetAttempts(ip: string): void {
-  failedAttempts.delete(ip);
+export async function isRateLimited(ip: string): Promise<boolean> {
+  const store = await getStore();
+  return (await store.fails(ip)) >= MAX_ATTEMPTS;
+}
+
+export async function recordFailedAttempt(ip: string): Promise<void> {
+  const store = await getStore();
+  await store.bump(ip);
+}
+
+export async function resetAttempts(ip: string): Promise<void> {
+  const store = await getStore();
+  await store.reset(ip);
 }

@@ -1,7 +1,26 @@
+import picomatch from 'picomatch';
 import config from 'virtual:owner-portal/config';
 
+// Each allowedFiles[].path is treated as a picomatch pattern. A literal path
+// (no glob characters) matches only itself; a glob like `src/content/**/*.md`
+// matches every file under it, so new files are covered without config edits.
+const matchers = config.allowedFiles.map((f) => ({
+  entry: f,
+  isMatch: picomatch(f.path, { dot: true }),
+}));
+
+/** The raw allowlist patterns, for display in the assistant's system prompt. */
+export function allowedPatterns(): string[] {
+  return config.allowedFiles.map((f) => f.path);
+}
+
+/** The allowlist entry whose pattern matches `path`, if any. */
+export function matchingEntry(path: string) {
+  return matchers.find((m) => m.isMatch(path))?.entry;
+}
+
 export function isReadable(path: string): boolean {
-  return config.allowedFiles.some((f) => f.path === path);
+  return matchers.some((m) => m.isMatch(path));
 }
 
 export const isWritable = isReadable;
@@ -17,7 +36,7 @@ export function isFieldEditAllowed(
   oldText: string,
   newText: string,
 ): { ok: boolean; reason?: string } {
-  const entry = config.allowedFiles.find((f) => f.path === path);
+  const entry = matchingEntry(path);
   if (!entry) return { ok: false, reason: `${path} is not in allowedFiles.` };
   if (!entry.allowedFields) return { ok: true }; // full-file editable
 

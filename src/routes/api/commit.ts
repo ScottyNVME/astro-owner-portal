@@ -1,13 +1,12 @@
 import type { APIRoute } from 'astro';
 import config from 'virtual:owner-portal/config';
 import { readSession } from '../../lib/auth.js';
-import { isWritable, isFieldEditAllowed } from '../../lib/allowlist.js';
-import { createBranch, commitEdit, generateBranchName, previewUrlFor } from '../../lib/github.js';
+import { isWritable, isFieldEditAllowed, matchingEntry } from '../../lib/allowlist.js';
+import { commitEdit } from '../../lib/github.js';
 
 export const prerender = false;
 
 type ApplyBody = {
-  branch?: string;
   path: string;
   oldString: string;
   newString: string;
@@ -40,7 +39,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // Per-field guard for files that declare allowedFields.
-  const entry = config.allowedFiles.find((f) => f.path === body.path);
+  const entry = matchingEntry(body.path);
   if (entry?.allowedFields) {
     const check = isFieldEditAllowed(body.path, body.oldString, body.newString);
     if (!check.ok) {
@@ -52,13 +51,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   try {
-    const branch = body.branch ?? generateBranchName();
-    if (!body.branch) {
-      await createBranch(branch);
-    }
-
     await commitEdit({
-      branch,
       path: body.path,
       oldString: body.oldString,
       newString: body.newString,
@@ -66,10 +59,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
 
     return new Response(
-      JSON.stringify({
-        branch,
-        previewUrl: previewUrlFor(branch),
-      }),
+      JSON.stringify({ ok: true, summary: body.summary, productionDomain: config.productionDomain }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     );
   } catch (err) {

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0
+
+Domain-agnostic, hardened release. The package no longer carries any restaurant-specific defaults, and the edit flow is simplified to commit-direct-to-live with one-click undo.
+
+### Breaking changes
+- **Removed the preview/publish/discard flow.** Approved edits now commit directly to `main` (Vercel redeploys in ~30s). The `/api/publish` and `/api/discard` routes are gone; a new **`/api/revert`** undoes the most recent change. A build-breaking edit can't take the site down — Vercel won't promote a failing build.
+- **Removed the `branchPrefix` option** (no draft branches anymore).
+- **Removed the optional `VERCEL_PROJECT_NAME` / `VERCEL_SCOPE_SLUG` env vars** (no preview-URL derivation needed).
+
+### Features
+- **Domain-neutral defaults** — neutral slate theme, generic `examples/minimal` (replaces `minimal-restaurant`).
+- **zod-validated config** with clearer errors, plus `defineOwnerPortalConfig()` and `presets.astroContentSite()` authoring helpers.
+- **Glob allowlists** — `allowedFiles[].path` accepts globs (e.g. `src/content/**/*.md`); a new `list_files` tool lets the assistant resolve them to concrete files.
+- **Durable login rate-limit** via Upstash/Vercel-KV (`UPSTASH_REDIS_REST_URL`/`_TOKEN` or `KV_REST_API_URL`/`_TOKEN`), with in-memory fallback.
+- **`/api/health`** readiness route + aggregated required-env check.
+- Test suite (Vitest), CI + Changesets release workflows, npm provenance on publish.
+
 ## 0.1.0 — 2026-05-10
 
 First release. Astro integration that mounts a Claude-powered owner-portal under a configurable `adminPath`. Extracted from the inline implementation in `ScottyNVME/baan-khun-restaurant` (Mi Bella Ilución).
