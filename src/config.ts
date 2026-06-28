@@ -25,6 +25,8 @@ export type OwnerPortalOptions = {
   imageUploadDir: string;
   imageMaxWidth?: number;
   systemPromptExtra?: string;
+  /** Plain-English note shown to the owner about what they can change. Falls back to a generic friendly line. */
+  welcomeHint?: string;
   productionDomain: string;
   contactInfo: string;
   model?: string;
@@ -40,6 +42,7 @@ export type ResolvedOptions = Required<
   allowedFiles: AllowedFile[];
   imageMaxWidth: number;
   systemPromptExtra: string;
+  welcomeHint: string;
   model: string;
 };
 
@@ -83,6 +86,7 @@ const optionsSchema = z.object({
   imageUploadDir: z.string().min(1, 'imageUploadDir is required (e.g. "public/img/uploads")'),
   imageMaxWidth: z.number().int().positive().optional(),
   systemPromptExtra: z.string().optional(),
+  welcomeHint: z.string().optional(),
   productionDomain: z.string().min(1, 'productionDomain is required (e.g. "www.example.com")'),
   contactInfo: z.string().min(1, 'contactInfo is required (shown to the owner on error cards)'),
   model: z.string().min(1).optional(),
@@ -108,6 +112,7 @@ export function validateAndResolve(input: OwnerPortalOptions): ResolvedOptions {
     imageUploadDir: o.imageUploadDir,
     imageMaxWidth: o.imageMaxWidth ?? DEFAULTS.imageMaxWidth,
     systemPromptExtra: o.systemPromptExtra ?? '',
+    welcomeHint: o.welcomeHint ?? '',
     productionDomain: o.productionDomain,
     contactInfo: o.contactInfo,
     model: o.model ?? DEFAULTS.model,

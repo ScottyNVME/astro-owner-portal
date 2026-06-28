@@ -96,6 +96,7 @@ describe('SemVer surface (contract)', () => {
         'model',
         'productionDomain',
         'systemPromptExtra',
+        'welcomeHint',
       ].sort(),
     );
   });

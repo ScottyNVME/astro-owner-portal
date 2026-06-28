@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Replace the chat welcome card's raw allowlist dump (file paths + field names) with a friendly, non-technical line. New optional `welcomeHint` config string lets each site say in plain English what the owner can change; falls back to a generic friendly message.
+
 ## 0.2.0
 
 Domain-agnostic, hardened release. The package no longer carries any restaurant-specific defaults, and the edit flow is simplified to commit-direct-to-live with one-click undo.

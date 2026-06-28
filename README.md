@@ -91,6 +91,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 | `imageUploadDir` | `string` | (required) | e.g. `'public/img/uploads'`. Where uploads commit |
 | `imageMaxWidth` | `number` | `1200` | sharp resize cap |
 | `systemPromptExtra` | `string` | `''` | Appended to the base system prompt. Describe your data shapes here |
+| `welcomeHint` | `string` | generic line | Plain-English note shown to the owner on the chat welcome card about what they can change |
 | `productionDomain` | `string` | (required) | Shown to the owner in the "Change is live, updates in ~30s" status |
 | `contactInfo` | `string` | (required) | Shown on the budget-exhausted card ("Text Scott", "Email support@…") |
 | `model` | `string` | `'claude-sonnet-4-6'` | Any Anthropic model id |

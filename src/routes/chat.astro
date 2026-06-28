@@ -19,9 +19,9 @@ if (Astro.request.method === 'POST') {
 
 const accent = config.brand.accentColor;
 const apiBase = `${config.adminPath}/api`;
-const allowedScopeLine = config.allowedFiles
-  .map((f) => (f.allowedFields ? `${f.path} (${f.allowedFields.join(', ')})` : f.path))
-  .join(', ');
+const welcomeHint =
+  config.welcomeHint ||
+  "Just tell me what you'd like to change. If something can't be edited here, I'll let you know.";
 ---
 <!doctype html>
 <html lang="en">
@@ -62,7 +62,7 @@ const allowedScopeLine = config.allowedFiles
             Tell me what you want to change in plain English. I'll show you the exact change to approve before it goes live, and you can undo the last change anytime. You can also drag a photo onto this window.
           </p>
           <p class="op-welcome-footnote">
-            Editable on this site: <strong>{allowedScopeLine}</strong>. Approved changes go live in about 30 seconds.
+            {welcomeHint} Approved changes go live in about 30 seconds.
           </p>
         </div>
 
