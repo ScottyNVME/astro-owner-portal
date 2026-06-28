@@ -23,11 +23,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      # Opens/updates a "Version Packages" PR from pending changesets; when that
-      # PR merges, publishes to npm with provenance.
+      # Opens/updates a "Version Packages" PR from pending changesets.
+      # npm publishing is OPT-IN (we currently distribute via git tag): when you
+      # want to publish to the registry, add `with: { publish: npm run release }`
+      # here and set an NPM_TOKEN secret (+ NODE_AUTH_TOKEN env).
       - uses: changesets/action@v1
-        with:
-          publish: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
