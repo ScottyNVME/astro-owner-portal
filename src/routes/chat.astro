@@ -35,7 +35,7 @@ const welcomeHint =
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
     />
     {config.brand.themeCss && <link rel="stylesheet" href={config.brand.themeCss} />}
-    <style is:inline set:html={`:root { --op-accent: ${accent}; --op-accent-dark: color-mix(in srgb, ${accent} 82%, black); }`}></style>
+    <style is:inline set:html={`:root:root { --op-accent: ${accent}; --op-accent-dark: color-mix(in srgb, ${accent} 82%, black); }`}></style>
   </head>
   <body>
     <div class="op-chat-shell">

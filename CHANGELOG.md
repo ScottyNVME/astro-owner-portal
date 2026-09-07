@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Fix `brand.accentColor` being ignored. Astro injects the bundled `theme.css` link after the inline accent rule, so the default slate `--op-accent` overrode the configured colour on both the login and chat pages. The inline rule now uses `:root:root` so the configured accent always wins.
+
 ## 0.2.1
 
 - Replace the chat welcome card's raw allowlist dump (file paths + field names) with a friendly, non-technical line. New optional `welcomeHint` config string lets each site say in plain English what the owner can change; falls back to a generic friendly message.

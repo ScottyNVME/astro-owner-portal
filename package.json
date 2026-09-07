@@ -1,6 +1,6 @@
 {
   "name": "@scottynvme/owner-portal",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Astro integration that injects a Claude-powered owner-edit portal into a static site",
   "type": "module",
   "license": "MIT",
