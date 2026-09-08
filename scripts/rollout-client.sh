@@ -11,6 +11,9 @@
 #   CLIENT_BRANCH branch to push to                                  (default: main)
 #   PORTAL_REPO   GitHub owner/name of the portal                    (default: scottynvme/astro-owner-portal)
 #   DRY_RUN       1 = do everything except push                      (default: 0)
+#   GIT_USER_NAME / GIT_USER_EMAIL  identity for the rollout commit   (required)
+#                 Must be a real GitHub account that is a member of the Vercel
+#                 team, or Vercel refuses to build the commit.
 #   GITHUB_OUTPUT if set (GitHub Actions), result lines are appended for the job summary
 #
 # Exit codes: 0 = updated, already current, or not a portal client (skipped);
@@ -81,8 +84,10 @@ else
 fi
 
 # 6. Commit only the dependency change. Anything else in the tree is not ours.
-git config user.name "${GIT_USER_NAME:-owner-portal-rollout}"
-git config user.email "${GIT_USER_EMAIL:-owner-portal-rollout@users.noreply.github.com}"
+: "${GIT_USER_NAME:?GIT_USER_NAME is required (a real GitHub login; Vercel rejects unknown authors)}"
+: "${GIT_USER_EMAIL:?GIT_USER_EMAIL is required (the users.noreply.github.com address of that account)}"
+git config user.name "$GIT_USER_NAME"
+git config user.email "$GIT_USER_EMAIL"
 git add package.json package-lock.json
 git commit -q -m "Owner portal ${PORTAL_REF}" \
   -m "Automated rollout of ${PKG}@${installed} from ${PORTAL_REPO}."

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Rollout commits are now authored by the `ROLLOUT_TOKEN` owner's real GitHub account (resolved from the token at run time). Vercel refuses to build commits from authors who are not members of the Vercel team, so the 0.2.3 rollout landed in every client repo but was never deployed. The script now requires an identity rather than defaulting to a bot name.
+
 ## 0.2.3
 
 - **Automatic rollout to every client.** Pushing a `vX.Y.Z` tag now runs `.github/workflows/rollout.yml`, which bumps each site in `clients.json` to that release, builds it as a pre-flight check, and pushes the commit so Vercel redeploys. One release, every client. Needs a `ROLLOUT_TOKEN` repository secret (fine-grained PAT, Contents read & write on the client repos). Can also be run by hand from the Actions tab for one client or as a dry run.

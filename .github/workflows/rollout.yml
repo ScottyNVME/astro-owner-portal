@@ -131,6 +131,24 @@ jobs:
         with:
           node-version: 22
 
+      # Vercel only builds commits whose author is a member of the Vercel team,
+      # so the rollout commit must be authored by the token's owner (a real
+      # GitHub account), not by a made-up bot identity.
+      - name: Commit as the token owner
+        id: who
+        env:
+          GH_TOKEN: ${{ secrets.ROLLOUT_TOKEN }}
+        run: |
+          login="$(gh api user --jq .login)"
+          id="$(gh api user --jq .id)"
+          if [ -z "$login" ] || [ -z "$id" ]; then
+            echo "::error::could not resolve the ROLLOUT_TOKEN owner via the GitHub API"
+            exit 1
+          fi
+          echo "name=$login" >> "$GITHUB_OUTPUT"
+          echo "email=${id}+${login}@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+          echo "committing as $login"
+
       - name: Roll ${{ matrix.client.name }} forward to ${{ needs.plan.outputs.tag }}
         id: roll
         env:
@@ -138,6 +156,8 @@ jobs:
           CLIENT_DIR: ${{ github.workspace }}/client
           CLIENT_BRANCH: ${{ matrix.client.branch || 'main' }}
           DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+          GIT_USER_NAME: ${{ steps.who.outputs.name }}
+          GIT_USER_EMAIL: ${{ steps.who.outputs.email }}
         run: bash portal/scripts/rollout-client.sh
 
       - name: Summary
