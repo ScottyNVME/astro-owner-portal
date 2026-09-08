@@ -1,9 +1,15 @@
 import type { AstroIntegration } from 'astro';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { validateAndResolve, type OwnerPortalOptions } from './config.js';
 import { ownerPortalConfigPlugin } from './virtual.js';
 
 const routeUrl = (rel: string) => new URL(`./routes/${rel}`, import.meta.url);
+
+// Both src/index.ts and dist/index.js sit one level below package.json.
+const VERSION: string = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version;
 
 const ROUTE_FILES = [
   { sub: '', file: 'login.astro' },
@@ -25,7 +31,7 @@ export default function ownerPortal(rawOptions: OwnerPortalOptions): AstroIntegr
       'astro:config:setup': ({ injectRoute, updateConfig, logger }) => {
         updateConfig({
           vite: {
-            plugins: [ownerPortalConfigPlugin(options)],
+            plugins: [ownerPortalConfigPlugin({ ...options, version: VERSION })],
           },
         });
 
@@ -38,7 +44,7 @@ export default function ownerPortal(rawOptions: OwnerPortalOptions): AstroIntegr
         }
 
         logger.info(
-          `mounted at ${options.adminPath} (${ROUTE_FILES.length} routes) for brand "${options.brand.name}"`,
+          `v${VERSION} mounted at ${options.adminPath} (${ROUTE_FILES.length} routes) for brand "${options.brand.name}"`,
         );
       },
     },

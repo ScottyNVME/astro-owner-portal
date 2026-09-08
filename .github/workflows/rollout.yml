@@ -1,0 +1,174 @@
+name: Rollout to clients
+
+# Every tagged release (vX.Y.Z) is pushed to every client site listed in
+# clients.json: the client's package.json + lockfile are bumped to the tag,
+# the site is built as a pre-flight check, and the commit is pushed. Vercel
+# then redeploys each site as it would for any other commit.
+#
+# Needs one repository secret: ROLLOUT_TOKEN, a fine-grained GitHub PAT with
+# Contents: read & write (and Metadata: read) on every client repo.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to roll out (e.g. v0.2.3)'
+        required: true
+        type: string
+      only:
+        description: 'Optional: a single client repo (owner/name) instead of all'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Do everything except push'
+        required: false
+        type: boolean
+        default: false
+
+# One rollout at a time; a second tag queues behind the first.
+concurrency:
+  group: rollout
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="${GITHUB_REF#refs/tags/}"
+          fi
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'$tag' is not a vX.Y.Z release tag"; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Secret present
+        env:
+          HAS_TOKEN: ${{ secrets.ROLLOUT_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::error::ROLLOUT_TOKEN secret is not set on this repository. Nothing was rolled out."
+            exit 1
+          fi
+
+      - name: Tag matches package.json version
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "v$pkg" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match package.json version $pkg. Bump the version, commit, then tag that commit."
+            exit 1
+          fi
+          echo "releasing $TAG"
+
+      - name: Build client matrix
+        id: matrix
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          if [ -n "$ONLY" ]; then
+            m="$(jq -c --arg only "$ONLY" '[.clients[] | select(.repo == $only)]' clients.json)"
+          else
+            m="$(jq -c '.clients' clients.json)"
+          fi
+          n="$(echo "$m" | jq 'length')"
+          if [ "$n" = "0" ]; then
+            echo "::error::no clients matched (ONLY='$ONLY'). Check clients.json."
+            exit 1
+          fi
+          echo "rolling out to $n client(s):"
+          echo "$m" | jq -r '.[] | "  - \(.name) (\(.repo)@\(.branch // "main"))"'
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+
+  rollout:
+    name: ${{ matrix.client.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Check out portal (for the rollout script)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+          path: portal
+
+      - name: Check out ${{ matrix.client.repo }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.client.repo }}
+          ref: ${{ matrix.client.branch || 'main' }}
+          token: ${{ secrets.ROLLOUT_TOKEN }}
+          path: client
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Roll ${{ matrix.client.name }} forward to ${{ needs.plan.outputs.tag }}
+        id: roll
+        env:
+          PORTAL_REF: ${{ needs.plan.outputs.tag }}
+          CLIENT_DIR: ${{ github.workspace }}/client
+          CLIENT_BRANCH: ${{ matrix.client.branch || 'main' }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+        run: bash portal/scripts/rollout-client.sh
+
+      - name: Summary
+        if: always()
+        env:
+          NAME: ${{ matrix.client.name }}
+          REPO: ${{ matrix.client.repo }}
+          RESULT: ${{ steps.roll.outputs.result || 'failed' }}
+          SHA: ${{ steps.roll.outputs.sha }}
+        run: |
+          {
+            echo "### $NAME"
+            echo ""
+            echo "- repo: \`$REPO\`"
+            echo "- result: **$RESULT**"
+            if [ -n "$SHA" ]; then echo "- commit: \`$SHA\`"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  report:
+    name: Report
+    needs: [plan, rollout]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Overall result
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          RESULT: ${{ needs.rollout.result }}
+        run: |
+          echo "rollout of $TAG: $RESULT"
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::at least one client did not update. Open the failed job above; the sites that succeeded are already live on $TAG."
+            exit 1
+          fi

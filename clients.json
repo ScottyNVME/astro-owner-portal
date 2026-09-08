@@ -1,0 +1,10 @@
+{
+  "$comment": "Every site listed here receives each tagged release automatically (see .github/workflows/rollout.yml). Add a client: one object with repo (owner/name), branch, and a display name. The ROLLOUT_TOKEN secret must be able to write to the repo.",
+  "clients": [
+    {
+      "name": "Sendai Sushi & Korean BBQ",
+      "repo": "ScottyNVME/sendai-river-edge",
+      "branch": "main"
+    }
+  ]
+}

@@ -141,6 +141,26 @@ On Vercel, project env vars land in `process.env` automatically.
 
 End-to-end recipe in [examples/minimal/README.md](examples/minimal/README.md). Short version: push the host site to GitHub, import the repo in Vercel, set the five env vars above. The Vercel adapter generates a single `_render.func` serverless function for all owner-portal routes; the rest of your site stays static.
 
+## Rolling a release out to every client
+
+Client sites pin the portal to a git tag, so they never change until you say so. Saying so is one command.
+
+1. Bump `version` in `package.json`, add a `CHANGELOG.md` entry, commit to `main`.
+2. Tag that commit and push the tag:
+
+   ```sh
+   git tag v0.2.4 && git push origin v0.2.4
+   ```
+
+The **Rollout to clients** workflow (`.github/workflows/rollout.yml`) then runs `scripts/rollout-client.sh` against every site in `clients.json`: it installs the tag, checks the installed version matches, builds the site as a pre-flight, commits `package.json` + `package-lock.json`, and pushes. Vercel redeploys each site from that commit. The Actions summary lists every client with `updated`, `already-current`, or `failed`, and the run goes red if any client did not update (the ones that did are already live).
+
+- **Add a client:** one entry in `clients.json` (`name`, `repo`, `branch`). The rollout token must be able to write to it.
+- **Secret:** `ROLLOUT_TOKEN`, a fine-grained GitHub PAT with *Contents: read & write* (and *Metadata: read*) on each client repo. Set it once under the portal repo's Settings → Secrets and variables → Actions.
+- **Guard rails:** the tag must equal the package version or nothing runs; a client whose build fails with the new release is not pushed; concurrent rollouts queue rather than overlap; a push that races an owner's own portal commit is retried on top of it.
+- **By hand:** Actions → Rollout to clients → Run workflow lets you re-run a tag, target one client (`only`), or do a `dry_run` that stops before pushing.
+- **Verify from outside:** `GET /studio/api/health` returns `{ "ok": true, "version": "0.2.4" }`, and the login page carries `<meta name="generator" content="owner-portal 0.2.4">`.
+- **Roll one client back:** `git revert` the rollout commit in that site. Nothing else is involved.
+
 ## How it works
 
 1. Owner visits `${adminPath}` and signs in with the shared password. Server bcrypts, issues a 4-hour JWT in an `httpOnly` cookie.

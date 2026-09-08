@@ -4,7 +4,9 @@ import type { ResolvedOptions } from './config.js';
 const VIRTUAL_ID = 'virtual:owner-portal/config';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
 
-export function ownerPortalConfigPlugin(options: ResolvedOptions): Plugin {
+export type VirtualConfig = ResolvedOptions & { version: string };
+
+export function ownerPortalConfigPlugin(options: VirtualConfig): Plugin {
   return {
     name: 'owner-portal:virtual-config',
     enforce: 'pre',

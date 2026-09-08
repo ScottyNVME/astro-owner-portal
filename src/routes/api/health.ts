@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import config from 'virtual:owner-portal/config';
 import { missingEnv } from '../../lib/env.js';
 
 export const prerender = false;
@@ -8,7 +9,8 @@ export const prerender = false;
 export const GET: APIRoute = async () => {
   const missing = missingEnv();
   const ok = missing.length === 0;
-  const body = import.meta.env.PROD ? { ok } : { ok, missing };
+  const version = config.version;
+  const body = import.meta.env.PROD ? { ok, version } : { ok, version, missing };
   return new Response(JSON.stringify(body), {
     status: ok ? 200 : 503,
     headers: { 'content-type': 'application/json' },
