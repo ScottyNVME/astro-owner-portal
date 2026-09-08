@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- **Automatic rollout to every client.** Pushing a `vX.Y.Z` tag now runs `.github/workflows/rollout.yml`, which bumps each site in `clients.json` to that release, builds it as a pre-flight check, and pushes the commit so Vercel redeploys. One release, every client. Needs a `ROLLOUT_TOKEN` repository secret (fine-grained PAT, Contents read & write on the client repos). Can also be run by hand from the Actions tab for one client or as a dry run.
+- `/api/health` now reports the running package `version`, and the login page carries a `generator` meta tag, so a rollout can be verified from outside.
+
 ## 0.2.2
 
 - Fix `brand.accentColor` being ignored. Astro injects the bundled `theme.css` link after the inline accent rule, so the default slate `--op-accent` overrode the configured colour on both the login and chat pages. The inline rule now uses `:root:root` so the configured accent always wins.
