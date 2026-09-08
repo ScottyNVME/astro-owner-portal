@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import config from 'virtual:owner-portal/config';
 import { missingEnv } from '../../lib/env.js';
+import { probeRepo } from '../../lib/github.js';
 
 export const prerender = false;
 
@@ -10,9 +11,15 @@ export const GET: APIRoute = async () => {
   const missing = missingEnv();
   const ok = missing.length === 0;
   const version = config.version;
-  const body = import.meta.env.PROD ? { ok, version } : { ok, version, missing };
+  // Only probe when the env is complete; otherwise the probe would just fail
+  // on the missing variable and add noise.
+  const github = ok ? await probeRepo() : 'skipped';
+  const healthy = ok && github === 'ok';
+  const body = import.meta.env.PROD
+    ? { ok: healthy, version, github }
+    : { ok: healthy, version, github, missing };
   return new Response(JSON.stringify(body), {
-    status: ok ? 200 : 503,
+    status: healthy ? 200 : 503,
     headers: { 'content-type': 'application/json' },
   });
 };

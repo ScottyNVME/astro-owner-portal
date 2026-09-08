@@ -160,7 +160,9 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
         ? `Editable files:\n${editable.join('\n')}`
         : 'No editable files found in the allowed scope.';
     } catch (err) {
-      return `ERROR listing files: ${err instanceof Error ? err.message : String(err)}`;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[owner-portal] list_files failed: ${msg}`);
+      return `ERROR listing files: ${msg}`;
     }
   }
 
@@ -173,7 +175,9 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
     try {
       return await readFile(path);
     } catch (err) {
-      return `ERROR reading ${path}: ${err instanceof Error ? err.message : String(err)}`;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[owner-portal] read_file ${path} failed: ${msg}`);
+      return `ERROR reading ${path}: ${msg}`;
     }
   }
 

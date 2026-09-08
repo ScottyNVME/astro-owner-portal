@@ -19,6 +19,25 @@ function repoParts(): { owner: string; repo: string } {
   return { owner, repo };
 }
 
+/**
+ * Can the configured token see the configured repo? Returns 'ok' or a short
+ * status string ('401 Bad credentials', '404 Not Found', ...). Never throws and
+ * never includes the token. 404 on a private repo usually means the token was
+ * not granted access to this repository; 401 means the token itself is wrong.
+ */
+export async function probeRepo(): Promise<string> {
+  try {
+    const oct = getClient();
+    const { owner, repo } = repoParts();
+    await oct.repos.get({ owner, repo });
+    return 'ok';
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    const msg = ((e.message ?? String(err)).split('\n')[0] ?? '').slice(0, 80);
+    return e.status ? `${e.status} ${msg}` : msg;
+  }
+}
+
 export async function readFile(path: string): Promise<string> {
   const oct = getClient();
   const { owner, repo } = repoParts();

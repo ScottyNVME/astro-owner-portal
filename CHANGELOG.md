@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5
+
+- `/api/health` now actually tests the GitHub connection and reports it (`"github": "ok"` or a status such as `404 Not Found`), so a token that exists but cannot reach the repo is diagnosable from outside without secrets. `ok` is false and the status is 503 when the probe fails.
+- GitHub read failures inside the chat loop are now written to the server log as well as returned to the assistant.
+
 ## 0.2.4
 
 - Rollout commits are now authored by the `ROLLOUT_TOKEN` owner's real GitHub account (resolved from the token at run time). Vercel refuses to build commits from authors who are not members of the Vercel team, so the 0.2.3 rollout landed in every client repo but was never deployed. The script now requires an identity rather than defaulting to a bot name.
