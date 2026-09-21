@@ -18,8 +18,32 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
-      - name: Example smoke build
+
+  # The package supports both Astro majors (peerDependencies: ^6 || ^7). Build
+  # the example against each so a break in either is caught here, not by a
+  # client site during a release rollout.
+  example:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - astro: '^6.0.0'
+            adapter: '^10.0.0'
+          - astro: '^7.0.0'
+            adapter: '^11.0.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Example smoke build (Astro ${{ matrix.astro }})
         run: |
           cd examples/minimal
           npm install
+          npm install --no-save astro@"${{ matrix.astro }}" @astrojs/vercel@"${{ matrix.adapter }}"
           npm run build

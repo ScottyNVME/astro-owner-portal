@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- **Astro 7 support.** `peerDependencies.astro` widened to `^6.0.0 || ^7.0.0`, so the portal installs on both majors. CI now builds `examples/minimal` against Astro 6 and Astro 7 (Vite 8) on every push.
+- **Security: upload route hardened.** `sharp` upgraded `^0.33.0` → `^0.35.4` (fixes the libvips/libheif CVEs and the AVIF/HEIF RCE — GHSA-f88m-g3jw-g9cj, GHSA-rgj7-g3m4-5g8c, GHSA-26w7-cxv4-gfx2). The route now verifies the uploaded file's real bytes with a magic-byte sniff (`src/lib/image-sniff.ts`) before calling `sharp`, so a client-declared MIME type can no longer route a different container to the decoder. `image/heic` and `image/heif` are dropped from the accepted set, and AVIF/HEIF byte-streams are rejected with a friendly message (JPG/PNG/WebP only; iPhone "Most Compatible" hint). The chat picker's `accept` is narrowed to match.
+
 ## 0.2.5
 
 - `/api/health` now actually tests the GitHub connection and reports it (`"github": "ok"` or a status such as `404 Not Found`), so a token that exists but cannot reach the repo is diagnosable from outside without secrets. `ok` is false and the status is 503 when the probe fails.
