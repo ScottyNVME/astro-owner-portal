@@ -1,6 +1,6 @@
 {
   "name": "@scottynvme/owner-portal",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Astro integration that injects a Claude-powered owner-edit portal into a static site",
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,7 @@
     "release": "changeset publish"
   },
   "peerDependencies": {
-    "astro": "^6.0.0"
+    "astro": "^6.0.0 || ^7.0.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
@@ -43,7 +43,7 @@
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
     "picomatch": "^4.0.2",
-    "sharp": "^0.33.0",
+    "sharp": "^0.35.4",
     "zod": "^3.24.1"
   },
   "optionalDependencies": {

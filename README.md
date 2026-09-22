@@ -16,8 +16,10 @@ Designed for: a freelance web consultant who builds simple sites for small busin
 npm install @scottynvme/owner-portal
 
 # or straight from a git tag (no npm publish needed; npm runs the prepare build on install)
-npm install github:scottynvme/astro-owner-portal#v0.2.0
+npm install github:scottynvme/astro-owner-portal#v0.3.0
 ```
+
+Requires **Astro 6 or 7** (`peerDependencies: astro ^6.0.0 || ^7.0.0`) and **Node ≥ 22.12**.
 
 ## Configure
 
@@ -173,7 +175,7 @@ The **Rollout to clients** workflow (`.github/workflows/rollout.yml`) then runs 
 
 A build-breaking edit can't take the site down: Vercel won't promote a failing build, so production stays on the last good deploy. The in-chat diff is the review step (no separate preview deploy).
 
-Image uploads work the same way: drag a photo into the chat → server resizes to WebP via `sharp` → commits to `main` → owner sees the new path and tells Claude where to use it.
+Image uploads work the same way: drag a JPG, PNG or WebP into the chat → server resizes to WebP via `sharp` → commits to `main` → owner sees the new path and tells Claude where to use it. The route verifies the file's real bytes (a magic-byte sniff) before handing it to `sharp`, so a spoofed MIME type can't smuggle another container in. AVIF/HEIC/HEIF are rejected on purpose — they decode through libheif; owners on iPhone should set Camera → Formats to "Most Compatible" (or upload a screenshot).
 
 ## Security
 

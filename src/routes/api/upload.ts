@@ -3,12 +3,19 @@ import sharp from 'sharp';
 import config from 'virtual:owner-portal/config';
 import { readSession } from '../../lib/auth.js';
 import { commitBinary } from '../../lib/github.js';
+import { sniffImage } from '../../lib/image-sniff.js';
 
 export const prerender = false;
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const WEBP_QUALITY = 80;
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+// First, cheap gate on the declared type. The authoritative check is the
+// magic-byte sniff of the buffer below, because `file.type` is client-supplied
+// and not trusted. AVIF/HEIC/HEIF are intentionally excluded — they decode
+// through libheif, the source of the CVEs this route must not expose.
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const UNSUPPORTED_IMAGE_MESSAGE =
+  'That image format is not supported. Please upload a JPG, PNG, or WebP. (On iPhone, set Camera → Formats to "Most Compatible", or take a screenshot of the photo.)';
 
 function safeFilename(originalName: string): string {
   const stem =
@@ -52,11 +59,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       { status: 413, headers: { 'content-type': 'application/json' } },
     );
   }
-  if (!ALLOWED_MIME.has(file.type)) {
-    return new Response(
-      JSON.stringify({ error: `Unsupported file type: ${file.type || 'unknown'}.` }),
-      { status: 415, headers: { 'content-type': 'application/json' } },
-    );
+  if (file.type && !ALLOWED_MIME.has(file.type)) {
+    return new Response(JSON.stringify({ error: UNSUPPORTED_IMAGE_MESSAGE }), {
+      status: 415,
+      headers: { 'content-type': 'application/json' },
+    });
   }
 
   const uploadDir = config.imageUploadDir.replace(/\/$/, '');
@@ -64,6 +71,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
     const inputBuf = Buffer.from(await file.arrayBuffer());
+
+    // Authoritative format check: verify the real bytes before handing the
+    // buffer to sharp, so a spoofed MIME type (e.g. an AVIF labelled
+    // image/jpeg) cannot reach the libheif decode path.
+    if (!sniffImage(inputBuf)) {
+      return new Response(JSON.stringify({ error: UNSUPPORTED_IMAGE_MESSAGE }), {
+        status: 415,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     const outputBuf = await sharp(inputBuf)
       .rotate()
       .resize({ width: config.imageMaxWidth, withoutEnlargement: true })
